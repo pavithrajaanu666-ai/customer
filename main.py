@@ -1,23 +1,25 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Header
 from datetime import datetime, timedelta
-from fastapi import HTTPException, Header
+import os
 import jwt
 import bcrypt
 import mysql.connector
+
 app = FastAPI()
 
 
-# Database Connection
+# ---------- Database Connection ----------
 mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="jananijaanu",
-    database="customer",
-    port=3306
+    host=os.environ["DB_HOST"],
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
+    database=os.environ["DB_NAME"],
+    port=int(os.environ.get("DB_PORT", 3306))
 )
 
+
 # ---------- Auth config ----------
-SECRET_KEY = "change-this-to-a-long-random-secret"  # move to an env var before deploying
+SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_MINUTES = 60
 
@@ -33,43 +35,32 @@ def create_token(username: str):
 def verify_token(authorization: str = Header(...)):
     try:
         scheme, token = authorization.split()
+
         if scheme.lower() != "bearer":
-            raise HTTPException(status_code=401, detail="Use 'Bearer <token>' in the Authorization header")
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            raise HTTPException(
+                status_code=401,
+                detail="Use 'Bearer <token>' in the Authorization header"
+            )
+
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
         return payload["sub"]
+
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired, please log in again")
+        raise HTTPException(
+            status_code=401,
+            detail="Token expired, please log in again"
+        )
+
     except (jwt.InvalidTokenError, ValueError):
-        raise HTTPException(status_code=401, detail="Invalid or malformed token")
-
-
-# ---------- Auth config ----------
-SECRET_KEY = "change-this-to-a-long-random-secret"  # move to an env var before deploying
-ALGORITHM = "HS256"
-TOKEN_EXPIRE_MINUTES = 60
-
-
-def create_token(username: str):
-    payload = {
-        "sub": username,
-        "exp": datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-
-def verify_token(authorization: str = Header(...)):
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise HTTPException(status_code=401, detail="Use 'Bearer <token>' in the Authorization header")
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload["sub"]
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired, please log in again")
-    except (jwt.InvalidTokenError, ValueError):
-        raise HTTPException(status_code=401, detail="Invalid or malformed token")
-
-
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or malformed token"
+        )
 # ---------- Auth routes ----------
 DEMO_USERNAME = "jaanu"
 DEMO_PASSWORD = "test123"
